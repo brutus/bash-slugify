@@ -201,9 +201,73 @@ function get_arguments() {
 ### SLUGIFY
 
 function slugify(){
-  name="$@"
-  newname=$name
-  echo "$newname"
+  # echos the slugify version of all args consolidated
+
+  local name="$@"
+  local safechars='-_. a-zA-Z0-9'
+
+  if [ -z "$name" ]; then
+    echo "[ERROR] need a string to slugify."
+    exit 2
+  fi
+
+  ## HANDLE CHARACTERS
+
+  # convert to uppercase
+  if [ $TO_UPPERCASE -eq 1 ]; then
+    name=$(echo "$name" | tr a-zäöü A-ZÄÖÜ)
+  fi
+
+  # convert to lowercase
+  if [ $TO_LOWERCASE -eq 1 ]; then
+    name=$(echo "$name" | tr A-ZÄÖÜ a-zäöü)
+  fi
+
+  # replace special chars
+  if [ $REPLACE_SPECIAL_CHARS -eq 1 ]; then
+    name=$(echo "${name//[^${safechars}]/$REPLACE_CHAR}")
+  fi
+
+  # remove special chars
+  if [ $REMOVE_SPECIAL_CHARS -eq 1 ]; then
+    name=$(echo "${name//[^${safechars}]/}")
+  fi
+
+  ## HANDLE SPACES
+
+  # remove dashes?
+  if [ $KEEP_DASHES -eq 0 ]; then
+    name=$(echo "${name//-/' '}")
+  fi
+
+  # remove underscores?
+  if [ $KEEP_UNDERSCORES -eq 0 ]; then
+    name=$(echo "${name//_/ }")
+  fi
+
+  # remove dots?
+  if [ $KEEP_DOTS -eq 0 ]; then
+    name=$(echo "${name//./ }")
+  fi
+
+  # consolidate spaces
+  if [ $CONSOLIDATE_SPACES -eq 1 ]; then
+    name=$(echo "${name}" | tr -s '[:space:]')
+  fi
+
+  # keep spaces around dashes and underscores?
+  if [ $KEEP_SPACES_AROUND_DASHSCORES -eq 0 ]; then
+    name=$(echo "${name// -/-}")
+    name=$(echo "${name//- /-}")
+    name=$(echo "${name// _/_}")
+    name=$(echo "${name//_ /_}")
+  fi
+
+  ## REPLACE SPACE
+
+  name=$(echo "${name// /$SPACE_CHAR}")
+
+  echo "$name"
 }
 
 ## MODES
