@@ -36,15 +36,17 @@ KEEP_UNDERSCORES=0
 KEEP_DOTS=0
 KEEP_SPACES_AROUND_DASHSCORES=0
 CONSOLIDATE_SPACES=1
+IGNORE_EXT=0
 
 # replacement options
 SPACE_CHAR='-'
 REPLACEMENT_CHAR='_'
 
 # mode options
+EXTEND=0
+MOVE=0
 DRY_RUN=0
 FORCE=0
-EXTEND=0
 
 # other options
 VERBOSE=0
@@ -53,14 +55,14 @@ DEBUG=0
 
 ### ARGUMENTS
 
-OPTS_STRING=':lurxDUPASc:C:snfevdh'
-OPTION_STRING='[(l|u)|(r|x)|D|U|P|A|S|(c <char>|s)|C <char>|n|f|e|v|d|h]…'
-USAGE="usage: slugify $OPTION_STRING <filename>…"
-DESCRIPTION='Changes the names of all given files to their slugs.'
+OPTS_STRING=':lurxDUPASEc:C:semnfvdh'
+OPTION_STRING='[(l|u)|(r|x)|D|U|P|A|S|E|(c <char>|s)|C <char>|e|m|n|f|v|d|h]…'
+USAGE="usage: slugify ${OPTION_STRING} <filename>…"
+DESCRIPTION='Slugifies filenames. List or changes the names of given files.'
 
-HELP="$USAGE
+HELP="${USAGE}
 
-$DESCRIPTION
+${DESCRIPTION}
 
 character options
   -l  convert to lowercase
@@ -74,6 +76,7 @@ space options
   -P  don't convert dots (points) to spaces
   -A  don't remove spaces around dashes and underscores
   -S  don't consolidate multiple spaces
+  -E  don't slugify extension
 
 replacement options
   -c <char> replace all spaces with this (default: '-')
@@ -81,9 +84,10 @@ replacement options
   -s use underscores for spaces (shortcut for '-c_')
 
 mode options
+  -m  move – rename files
   -n  dry run — don't rename anything
-  -f  force — overwrite existing files
-  -e  extend — treat all arguments as one string (no rename)
+  -f  force — overwrite existing files (on rename)
+  -e  extend — echo slug all arguments as one string (no rename)
 
 other options
   -v  verbose output
@@ -92,13 +96,13 @@ other options
 
 
 function print_usage(){
-  echo "$USAGE"
+  echo "${USAGE}"
   exit ${1:-0}
 }
 
 
 function print_help(){
-  echo "$HELP"
+  echo "${HELP}"
   exit ${1:-0}
 }
 
@@ -108,37 +112,39 @@ function print_options(){
   >&2 echo '# ======='
   >&2 echo '#'
   >&2 echo '# [character options]'
-  >&2 echo "# TO_UPPERCASE: $TO_UPPERCASE"
-  >&2 echo "# TO_LOWERCASE: $TO_LOWERCASE"
-  >&2 echo "# REMOVE_SPECIAL_CHARS: $REMOVE_SPECIAL_CHARS"
-  >&2 echo "# REPLACE_SPECIAL_CHARS: $REPLACE_SPECIAL_CHARS"
+  >&2 echo "# TO_UPPERCASE: ${TO_UPPERCASE}"
+  >&2 echo "# TO_LOWERCASE: ${TO_LOWERCASE}"
+  >&2 echo "# REMOVE_SPECIAL_CHARS: ${REMOVE_SPECIAL_CHARS}"
+  >&2 echo "# REPLACE_SPECIAL_CHARS: ${REPLACE_SPECIAL_CHARS}"
   >&2 echo '#'
   >&2 echo '# [space options]'
-  >&2 echo "# KEEP_DASHES: $KEEP_DASHES"
-  >&2 echo "# KEEP_UNDERSCORES: $KEEP_UNDERSCORES"
-  >&2 echo "# KEEP_DOTS: $KEEP_DOTS"
-  >&2 echo "# KEEP_SPACES_AROUND_DASHSCORES: $KEEP_SPACES_AROUND_DASHSCORES"
-  >&2 echo "# CONSOLIDATE_SPACES: $CONSOLIDATE_SPACES"
+  >&2 echo "# KEEP_DASHES: ${KEEP_DASHES}"
+  >&2 echo "# KEEP_UNDERSCORES: ${KEEP_UNDERSCORES}"
+  >&2 echo "# KEEP_DOTS: ${KEEP_DOTS}"
+  >&2 echo "# KEEP_SPACES_AROUND_DASHSCORES: ${KEEP_SPACES_AROUND_DASHSCORES}"
+  >&2 echo "# CONSOLIDATE_SPACES: ${CONSOLIDATE_SPACES}"
+  >&2 echo "# IGNORE_EXT: ${IGNORE_EXT}"
   >&2 echo '#'
   >&2 echo '# [replacement options]'
-  >&2 echo "# SPACE_CHAR: '$SPACE_CHAR'"
-  >&2 echo "# REPLACEMENT_CHAR: '$REPLACEMENT_CHAR'"
+  >&2 echo "# SPACE_CHAR: '${SPACE_CHAR}'"
+  >&2 echo "# REPLACEMENT_CHAR: '${REPLACEMENT_CHAR}'"
   >&2 echo '#'
   >&2 echo '# [mode options]'
-  >&2 echo "# DRY_RUN: $DRY_RUN"
-  >&2 echo "# FORCE: $FORCE"
-  >&2 echo "# EXTEND: $EXTEND"
+  >&2 echo "# EXTEND: ${EXTEND}"
+  >&2 echo "# MOVE: ${MOVE}"
+  >&2 echo "# DRY_RUN: ${DRY_RUN}"
+  >&2 echo "# FORCE: ${FORCE}"
   >&2 echo '#'
   >&2 echo '# [other options]'
-  >&2 echo "# VERBOSE: $VERBOSE"
-  >&2 echo "# DEBUG: $DEBUG"
+  >&2 echo "# VERBOSE: ${VERBOSE}"
+  >&2 echo "# DEBUG: ${DEBUG}"
 }
 
 
 function get_arguments() {
   local set_space_char=0
-  while getopts $OPTS_STRING opt "$@"; do
-    case $opt in
+  while getopts ${OPTS_STRING} opt "$@"; do
+    case ${opt} in
       l)
         TO_LOWERCASE=1
         ;;
@@ -166,25 +172,31 @@ function get_arguments() {
       S)
         CONSOLIDATE_SPACES=0
         ;;
+      E)
+        IGNORE_EXT=0
+        ;;
       c)
-        SPACE_CHAR=$OPTARG
-        set_space_char=$(($set_space_char + 1))
+        SPACE_CHAR=${OPTARG}
+        set_space_char=$((${set_space_char} + 1))
         ;;
       C)
-        REPLACEMENT_CHAR=$OPTARG
+        REPLACEMENT_CHAR=${OPTARG}
         ;;
       s)
         SPACE_CHAR='_'
-        set_space_char=$(($set_space_char + 1))
+        set_space_char=$((${set_space_char} + 1))
+        ;;
+      e)
+        EXTEND=1
+        ;;
+      m)
+        MOVE=1
         ;;
       n)
         DRY_RUN=1
         ;;
       f)
         FORCE=1
-        ;;
-      e)
-        EXTEND=1
         ;;
       v)
         VERBOSE=1
@@ -196,24 +208,24 @@ function get_arguments() {
         print_help
         ;;
       \?)
-        echo "Invalid option: -$OPTARG" >&2
+        echo "Invalid option: -${OPTARG}" >&2
         exit 1
         ;;
       :)
-        echo "Option -$OPTARG requires an argument." >&2
+        echo "Option -${OPTARG} requires an argument." >&2
         exit 1
         ;;
     esac
   done
-  if [ $TO_LOWERCASE -eq 1 -a $TO_UPPERCASE -eq 1 ]; then
+  if [ ${TO_LOWERCASE} -eq 1 -a ${TO_UPPERCASE} -eq 1 ]; then
     echo "'-l' and '-u' can't be used together." >&2
     exit 1
   fi
-  if [ $REMOVE_SPECIAL_CHARS -eq 1 -a $REPLACE_SPECIAL_CHARS -eq 1 ]; then
+  if [ ${REMOVE_SPECIAL_CHARS} -eq 1 -a ${REPLACE_SPECIAL_CHARS} -eq 1 ]; then
     echo "'-r' and '-x' can't be used together." >&2
     exit 1
   fi
-  if [ $set_space_char -eq 2 ]; then
+  if [ ${set_space_char} -eq 2 ]; then
     echo "'-c' and '-s' can't be used together." >&2
     exit 1
   fi
@@ -228,69 +240,69 @@ function slugify(){
   local name="$@"
   local safechars='-_. a-zA-Z0-9'
 
-  if [ -z "$name" ]; then
+  if [ -z "${name}" ]; then
     echo "[ERROR] need a string to slugify."
     exit 2
   fi
 
-  if [ $DEBUG -eq 1 ]; then
-    echo "# SLUG 1: '$name' (${#name})" >&2
+  if [ ${DEBUG} -eq 1 ]; then
+    echo "# SLUG 1: '${name}' (${#name})" >&2
   fi
 
   ## HANDLE CHARACTERS
 
   # convert to uppercase
-  if [ $TO_UPPERCASE -eq 1 ]; then
-    name=$(echo "$name" | tr a-zäöü A-ZÄÖÜ)
+  if [ ${TO_UPPERCASE} -eq 1 ]; then
+    name=$(echo "${name}" | tr a-zäöü A-ZÄÖÜ)
   fi
 
   # convert to lowercase
-  if [ $TO_LOWERCASE -eq 1 ]; then
-    name=$(echo "$name" | tr A-ZÄÖÜ a-zäöü)
+  if [ ${TO_LOWERCASE} -eq 1 ]; then
+    name=$(echo "${name}" | tr A-ZÄÖÜ a-zäöü)
   fi
 
   # replace special chars
-  if [ $REPLACE_SPECIAL_CHARS -eq 1 ]; then
+  if [ ${REPLACE_SPECIAL_CHARS} -eq 1 ]; then
     name=$(echo "${name//[^${safechars}]/$REPLACEMENT_CHAR}")
   fi
 
   # remove special chars
-  if [ $REMOVE_SPECIAL_CHARS -eq 1 ]; then
+  if [ ${REMOVE_SPECIAL_CHARS} -eq 1 ]; then
     name=$(echo "${name//[^${safechars}]/}")
   fi
 
-  if [ $DEBUG -eq 1 ]; then
-    echo "# SLUG 2: '$name' (${#name})" >&2
+  if [ ${DEBUG} -eq 1 ]; then
+    echo "# SLUG 2: '${name}' (${#name})" >&2
   fi
 
   ## HANDLE SPACES
 
   # remove dashes?
-  if [ $KEEP_DASHES -eq 0 ]; then
+  if [ ${KEEP_DASHES} -eq 0 ]; then
     name=$(echo "${name//-/' '}")
   fi
 
   # remove underscores?
-  if [ $KEEP_UNDERSCORES -eq 0 ]; then
+  if [ ${KEEP_UNDERSCORES} -eq 0 ]; then
     name=$(echo "${name//_/ }")
   fi
 
   # remove dots?
-  if [ $KEEP_DOTS -eq 0 ]; then
+  if [ ${KEEP_DOTS} -eq 0 ]; then
     name=$(echo "${name//./ }")
   fi
 
   # consolidate spaces
-  if [ $CONSOLIDATE_SPACES -eq 1 ]; then
+  if [ ${CONSOLIDATE_SPACES} -eq 1 ]; then
     name=$(echo "${name}" | tr -s '[:space:]')
   fi
 
-  if [ $DEBUG -eq 1 ]; then
-    echo "# SLUG 3: '$name' (${#name})" >&2
+  if [ ${DEBUG} -eq 1 ]; then
+    echo "# SLUG 3: '${name}' (${#name})" >&2
   fi
 
   # keep spaces around dashes and underscores?
-  if [ $KEEP_SPACES_AROUND_DASHSCORES -eq 0 ]; then
+  if [ ${KEEP_SPACES_AROUND_DASHSCORES} -eq 0 ]; then
     name=$(echo "${name// -/-}")
     name=$(echo "${name//- /-}")
     name=$(echo "${name// _/_}")
@@ -299,36 +311,119 @@ function slugify(){
 
   # trim spaces
 
-  name=$(echo "$name" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+  name=$(echo "${name}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
   # replace space
 
   name=$(echo "${name// /$SPACE_CHAR}")
 
-  if [ $DEBUG -eq 1 ]; then
-    echo "# SLUG 4: '$name' (${#name})" >&2
+  if [ ${DEBUG} -eq 1 ]; then
+    echo "# SLUG 4: '${name}' (${#name})" >&2
   fi
 
   # return slug
 
-  echo "$name"
+  echo "${name}"
 }
+
 
 ## MODES
 
-function rename_with_slug(){
+function run(){
   # creates a newname with slugify and tries to rename the file
-  name="$@"
-  echo "- $name"
-  newname=$(slugify "$@")
-  if [ -z "$newname" ]; then
-    echo "  [ERROR] slugified string is empty."
+
+  ## BUILD NAME
+
+  # get fullname
+  local fullname="$@"
+
+  # verbose output (full name)
+  if [ ${VERBOSE} -eq 1 ]; then
+    echo "- '${fullname}'"
+    padding='  '
   else
-    echo "  $newname"
-    if [ $DRY_RUN -eq 0 ]; then
-      echo "  -> rename"
+    padding=''
+  fi
+
+  # check if file exists
+  if [ ! -f "${fullname}" ]; then
+    if [ ${MOVE} -eq 1 ]; then
+      echo "${padding}[WARNING] '${fullname}' not found." >&2
+      return 1
+    fi
+  fi
+
+  # get filename
+  local path="${fullname%/*}"
+  local name="${fullname##*/}"
+  local ext="${fullname##*.}"
+
+  # check path
+  if [ "${path}" == "${fullname}" ]; then
+    path=''
+  else
+    path="${path}/"
+  fi
+
+  # check name
+  name="${name%.*}"  # remove extension
+  if [ -z "${name}" ]; then
+    name=".${ext}"
+    ext=''
+  fi
+
+  # check extension
+  if [ ! -z "${ext}" ]; then
+    if [ "${ext}" == "${fullname}" ]; then
+      ext=''
+    else
+      if [ ${IGNORE_EXT} -eq 0 ]; then
+        ext="$(slugify "${ext}")"
+      fi
+      ext=".${ext}"
+    fi
+  fi
+
+  # verbose output (basename only)
+  if [ ${VERBOSE} -eq 1 ]; then
+    echo "${padding}'${name}'"
+  fi
+
+  ## BUILD NEW NAME
+
+  newname="$(slugify "${name}")"
+
+  # check newname
+  if [ -z "${newname}" ]; then
+    echo "${padding}[ERROR] '${name}' results in an empty string." >&2
+    return 1
+  fi
+
+  # verbose output (new name)
+  if [ ${VERBOSE} -eq 1 ]; then
+    echo "${padding}'${newname}'"
+  fi
+
+  # build new fullname
+  local newfullname="${path}${newname}${ext}"
+
+  ## DO YOUR THING
+
+  if [ ${MOVE} -eq 1 ]; then
+
+    # RENAME
+
+    if [ "${fullname}" != "${newfullname}" ]; then
+      echo "${padding}${fullname} -> ${newfullname}"
       # TODO: rename file
     fi
+
+  else
+
+    # JUST LIST
+
+    echo "${padding}${newfullname}"
+
   fi
 }
 
@@ -350,7 +445,7 @@ function main(){
   fi
 
   # print verbose stuff
-  if [ $DEBUG -eq 1 ]; then
+  if [ ${DEBUG} -eq 1 ]; then
     print_options
     echo "#" >&2
     echo "# ARGUMENTS" >&2
@@ -363,22 +458,22 @@ function main(){
   ## LOOP OVER ARGS
 
   # retun one slug for all arguments (consolidated)
-  if [ $EXTEND -eq 1 ]; then
+  if [ ${EXTEND} -eq 1 ]; then
     newname="$(slugify "$@")"
-    echo "$newname"
-    if [ -z "$newname" ]; then
+    echo "${newname}"
+    if [ -z "${newname}" ]; then
       exit 3
     fi
 
   # rename each file given as arg
   else
     for fn in "$@"; do
-      rename_with_slug "$fn"
+      run "${fn}"
     done
   fi
 }
 
 
-if [ $MAIN -eq 1 ]; then
+if [ ${MAIN} -eq 1 ]; then
   main "$@"
 fi
