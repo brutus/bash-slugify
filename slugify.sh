@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+#
 # BASH SLUGIFY
 #
 # AUTHOR: Brutus [DMC] <brutus.dmc@googlemail.com>
@@ -8,10 +8,10 @@
 #
 # ERROR CODES:
 #
-# 0 all went well
-# 1 error parsing arguments
-# 2 original string is empty
-# 3 slugified string is empty
+# 0: all went well
+# 1: error parsing arguments
+# 2: original string is empty
+# 3: slugified string is empty
 
 if [ "$(basename -- $0)" == "bash" ]; then
   MAIN=0
@@ -39,10 +39,11 @@ CONSOLIDATE_SPACES=1
 
 # replacement options
 SPACE_CHAR='-'
-REPLACE_CHAR='_'
+REPLACEMENT_CHAR='_'
 
 # mode options
 DRY_RUN=0
+FORCE=0
 EXTEND=0
 
 # other options
@@ -52,8 +53,8 @@ DEBUG=0
 
 ### ARGUMENTS
 
-OPTS_STRING=':lurxDUASc:C:snevdh'
-OPTION_STRING='[(l|u)|(r|x)|D|U|A|S|(c <char>|s)|C <char>|n|e|v|d|h]…'
+OPTS_STRING=':lurxDUPASc:C:snfevdh'
+OPTION_STRING='[(l|u)|(r|x)|D|U|P|A|S|(c <char>|s)|C <char>|n|f|e|v|d|h]…'
 USAGE="usage: slugify $OPTION_STRING <filename>…"
 DESCRIPTION='Changes the names of all given files to their slugs.'
 
@@ -70,7 +71,7 @@ character options
 space options
   -D  don't convert dashes to spaces
   -U  don't convert underscores to spaces
-  -P  don't convert points to spaces
+  -P  don't convert dots (points) to spaces
   -A  don't remove spaces around dashes and underscores
   -S  don't consolidate multiple spaces
 
@@ -80,18 +81,27 @@ replacement options
   -s use underscores for spaces (shortcut for '-c_')
 
 mode options
-  -n  dry run – don't rename anything
-  -e  extended – treat all arguments as one string (no rename)
+  -n  dry run — don't rename anything
+  -f  force — overwrite existing files
+  -e  extend — treat all arguments as one string (no rename)
 
 other options
   -v  verbose output
   -d  debug output
   -h  print help"
 
+
 function print_usage(){
+  echo "$USAGE"
+  exit ${1:-0}
+}
+
+
+function print_help(){
   echo "$HELP"
   exit ${1:-0}
 }
+
 
 function print_options(){
   >&2 echo '# OPTIONS'
@@ -112,10 +122,11 @@ function print_options(){
   >&2 echo '#'
   >&2 echo '# [replacement options]'
   >&2 echo "# SPACE_CHAR: '$SPACE_CHAR'"
-  >&2 echo "# REPLACE_CHAR: '$REPLACE_CHAR'"
+  >&2 echo "# REPLACEMENT_CHAR: '$REPLACEMENT_CHAR'"
   >&2 echo '#'
   >&2 echo '# [mode options]'
   >&2 echo "# DRY_RUN: $DRY_RUN"
+  >&2 echo "# FORCE: $FORCE"
   >&2 echo "# EXTEND: $EXTEND"
   >&2 echo '#'
   >&2 echo '# [other options]'
@@ -123,7 +134,9 @@ function print_options(){
   >&2 echo "# DEBUG: $DEBUG"
 }
 
+
 function get_arguments() {
+  local set_space_char=0
   while getopts $OPTS_STRING opt "$@"; do
     case $opt in
       l)
@@ -144,7 +157,7 @@ function get_arguments() {
       U)
         KEEP_UNDERSCORES=1
         ;;
-      U)
+      P)
         KEEP_DOTS=1
         ;;
       A)
@@ -155,15 +168,20 @@ function get_arguments() {
         ;;
       c)
         SPACE_CHAR=$OPTARG
+        set_space_char=$(($set_space_char + 1))
         ;;
       C)
-        REPLACE_CHAR=$OPTARG
+        REPLACEMENT_CHAR=$OPTARG
         ;;
       s)
         SPACE_CHAR='_'
+        set_space_char=$(($set_space_char + 1))
         ;;
       n)
         DRY_RUN=1
+        ;;
+      f)
+        FORCE=1
         ;;
       e)
         EXTEND=1
@@ -175,7 +193,7 @@ function get_arguments() {
         DEBUG=1
         ;;
       h)
-        print_usage
+        print_help
         ;;
       \?)
         echo "Invalid option: -$OPTARG" >&2
@@ -195,6 +213,10 @@ function get_arguments() {
     echo "'-r' and '-x' can't be used together." >&2
     exit 1
   fi
+  if [ $set_space_char -eq 2 ]; then
+    echo "'-c' and '-s' can't be used together." >&2
+    exit 1
+  fi
 }
 
 
@@ -211,6 +233,10 @@ function slugify(){
     exit 2
   fi
 
+  if [ $DEBUG -eq 1 ]; then
+    echo "# SLUG 1: '$name' (${#name})" >&2
+  fi
+
   ## HANDLE CHARACTERS
 
   # convert to uppercase
@@ -225,12 +251,16 @@ function slugify(){
 
   # replace special chars
   if [ $REPLACE_SPECIAL_CHARS -eq 1 ]; then
-    name=$(echo "${name//[^${safechars}]/$REPLACE_CHAR}")
+    name=$(echo "${name//[^${safechars}]/$REPLACEMENT_CHAR}")
   fi
 
   # remove special chars
   if [ $REMOVE_SPECIAL_CHARS -eq 1 ]; then
     name=$(echo "${name//[^${safechars}]/}")
+  fi
+
+  if [ $DEBUG -eq 1 ]; then
+    echo "# SLUG 2: '$name' (${#name})" >&2
   fi
 
   ## HANDLE SPACES
@@ -255,6 +285,10 @@ function slugify(){
     name=$(echo "${name}" | tr -s '[:space:]')
   fi
 
+  if [ $DEBUG -eq 1 ]; then
+    echo "# SLUG 3: '$name' (${#name})" >&2
+  fi
+
   # keep spaces around dashes and underscores?
   if [ $KEEP_SPACES_AROUND_DASHSCORES -eq 0 ]; then
     name=$(echo "${name// -/-}")
@@ -263,9 +297,19 @@ function slugify(){
     name=$(echo "${name//_ /_}")
   fi
 
-  ## REPLACE SPACE
+  # trim spaces
+
+  name=$(echo "$name" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+  # replace space
 
   name=$(echo "${name// /$SPACE_CHAR}")
+
+  if [ $DEBUG -eq 1 ]; then
+    echo "# SLUG 4: '$name' (${#name})" >&2
+  fi
+
+  # return slug
 
   echo "$name"
 }
@@ -277,24 +321,34 @@ function rename_with_slug(){
   name="$@"
   echo "- $name"
   newname=$(slugify "$@")
-  echo "  $newname"
-  if [ $DRY_RUN -eq 0 ]; then
-    echo "  -> rename"
-    # TODO: rename file
+  if [ -z "$newname" ]; then
+    echo "  [ERROR] slugified string is empty."
+  else
+    echo "  $newname"
+    if [ $DRY_RUN -eq 0 ]; then
+      echo "  -> rename"
+      # TODO: rename file
+    fi
   fi
 }
 
 
 ## MAIN
 
-if [ $MAIN -eq 1 ]; then
-  # parse commandline
+function main(){
+
+  ## PARSE COMMANDLINE
+
   get_arguments "$@"
   shift $((OPTIND-1))
+
   # check args
   if [ $# -eq 0 ]; then
+    echo "[ERROR] at least one argument is needed. Try '-h' for help." >&2
+    echo >&2
     print_usage 1
   fi
+
   # print verbose stuff
   if [ $DEBUG -eq 1 ]; then
     print_options
@@ -302,15 +356,29 @@ if [ $MAIN -eq 1 ]; then
     echo "# ARGUMENTS" >&2
     echo "# =========" >&2
     for fn in "$@"; do
-      echo "# - $fn" >&2
+      echo "# - '$fn' (${#fn})" >&2
     done
   fi
-  # loop over args
+
+  ## LOOP OVER ARGS
+
+  # retun one slug for all arguments (consolidated)
   if [ $EXTEND -eq 1 ]; then
-    echo "$(slugify $@)"
+    newname="$(slugify "$@")"
+    echo "$newname"
+    if [ -z "$newname" ]; then
+      exit 3
+    fi
+
+  # rename each file given as arg
   else
     for fn in "$@"; do
-      rename_with_slug $fn
+      rename_with_slug "$fn"
     done
   fi
+}
+
+
+if [ $MAIN -eq 1 ]; then
+  main "$@"
 fi
