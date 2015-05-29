@@ -84,10 +84,10 @@ replacement options
   -s use underscores for spaces (shortcut for '-c_')
 
 mode options
+  -e  extend — echo a slug for all arguments as one string (no rename)
   -m  move – rename files
-  -n  dry run — don't rename anything
+  -n  dry run — show what would be renamed (don't do it)
   -f  force — overwrite existing files (on rename)
-  -e  extend — echo slug all arguments as one string (no rename)
 
 other options
   -v  verbose output
@@ -219,15 +219,15 @@ function get_arguments() {
   done
   if [ ${TO_LOWERCASE} -eq 1 -a ${TO_UPPERCASE} -eq 1 ]; then
     echo "'-l' and '-u' can't be used together." >&2
-    exit 1
+    print_usage 1
   fi
   if [ ${REMOVE_SPECIAL_CHARS} -eq 1 -a ${REPLACE_SPECIAL_CHARS} -eq 1 ]; then
     echo "'-r' and '-x' can't be used together." >&2
-    exit 1
+    print_usage 1
   fi
   if [ ${set_space_char} -eq 2 ]; then
     echo "'-c' and '-s' can't be used together." >&2
-    exit 1
+    print_usage 1
   fi
 }
 
@@ -238,7 +238,8 @@ function slugify(){
   # echos the slugify version of all args consolidated
 
   local name="$@"
-  local safechars='-_. a-zA-Z0-9'
+  local gluechars='-_. '
+  local safechars="${gluechars}a-zA-Z0-9"
 
   if [ -z "${name}" ]; then
     echo "[ERROR] need a string to slugify."
