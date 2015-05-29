@@ -415,7 +415,13 @@ function run(){
 
     if [ "${fullname}" != "${newfullname}" ]; then
       echo "${padding}${fullname} -> ${newfullname}"
-      # TODO: rename file
+      if [ -f "${newfullname}" ]; then
+        echo "${padding}[WARNING] '${newfullname}' already exists." >&2
+        if [ ${FORCE} -eq 0 ]; then
+          return
+        fi
+      fi
+      mv "${fullname}" "${newfullname}"
     fi
 
   else
