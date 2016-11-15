@@ -71,15 +71,29 @@ this helps me automate it.
 
 ## Examples
 
-    $ ./slugify.sh -ex HeLlo, fine WOrld!
-    HeLlo-fine-WOrld
+    $ ./slugify.sh foo 'Hello World!' Bar
+    foo
+    Hello-World!
+    Bar
 
-    $ ./slugify.sh -exl HeLlo, fine WOrld!
-    hello-fine-world
+    $ ./slugify.sh -e foo 'Hello World!' Bar
+    foo-Hello-World!-Bar
 
-    $ ./slugify.sh -eux HeLlo, C:3!
-    HELLO-C3
+    $ ./slugify.sh -el foo 'Hello World!' Bar
+    foo-hello-world!-bar
 
+    $ ./slugify.sh -exl foo Hello World! Bar
+    foo-hello-world-bar
+
+If you use the `-r` switch, arguments are threated as file names to be slugifed
+(and renamed). Here's the output if you run it dry (no renaming) in the
+directory of this repository — `$ ./slugify.sh -rn -lx *`:
+
+    CHANGELOG.md -> changelog.md
+    LICENSE -> license
+    README.md -> readme.md
+    src -> skipped (no change)
+    tests -> skipped (no change)
 
 ## Development
 
