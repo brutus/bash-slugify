@@ -403,9 +403,9 @@ function rename(){
 
   # debug output (name parts)
   if [ ${DEBUG} -eq 1 ]; then
-    echo "${PADDING}org path: '${path}'"
-    echo "${PADDING}org name: '${name}'"
-    echo "${PADDING}org ext.: '${ext}'"
+    echo "# ${PADDING}org path: '${path}'"
+    echo "# ${PADDING}org name: '${name}'"
+    echo "# ${PADDING}org ext.: '${ext}'"
   fi
 
   ## BUILD NEW NAME
@@ -420,9 +420,9 @@ function rename(){
 
   # debug output (new name)
   if [ ${DEBUG} -eq 1 ]; then
-    echo "${PADDING}new path: '${path}'"
-    echo "${PADDING}new name: '${newname}'"
-    echo "${PADDING}new ext.: '${ext}'"
+    echo "# ${PADDING}new path: '${path}'"
+    echo "# ${PADDING}new name: '${newname}'"
+    echo "# ${PADDING}new ext.: '${ext}'"
   fi
 
   # check newname
@@ -436,14 +436,14 @@ function rename(){
 
   ## RENAME
 
-  if [ ${DRY_RUN} -eq 0 ]; then
-    # check if file exists
-    if [ ! -f "${fullname}" ]; then
-      echo "${PADDING}[WARNING] '${fullname}' not found." >&2
-      return 4
-    fi
-    # rename file
-    if [ "${fullname}" != "${newfullname}" ]; then
+  if [ "${fullname}" != "${newfullname}" ]; then
+    if [ ${DRY_RUN} -eq 0 ]; then
+      # check if file exists
+      if [ ! -f "${fullname}" ]; then
+        echo "${PADDING}[WARNING] '${fullname}' not found." >&2
+        return 4
+      fi
+      # rename file
       echo "${PADDING}${fullname} -> ${newfullname}"
       if [ -f "${newfullname}" ]; then
         echo "${PADDING}[WARNING] '${newfullname}' already exists." >&2
@@ -453,10 +453,10 @@ function rename(){
       fi
       mv "${fullname}" "${newfullname}"
     else
-      echo "${PADDING}skipping ${fullname} (no change)"
+      echo "${PADDING}${fullname} -> ${newfullname}"
     fi
   else
-    echo "${PADDING}${newfullname}"
+    echo "${PADDING}${fullname} -> skipped (no change)"
   fi
 }
 
