@@ -2,8 +2,8 @@
 
 It slugifies strings. In your BASH.
 
-I need to clean filenames — like uploaded images and the like — regularly and
-this helps me automate it.
+I need to clean filenames — like uploaded images — regularly and this helps me
+automate it.
 
 
 ## What's happening?
@@ -19,6 +19,33 @@ this helps me automate it.
 - Whitespace is consolidated and trimmed.
 
 - All remaining spaces are replaced (default: `-`).
+
+
+## Examples
+
+    $ ./slugify.sh foo 'Hello World!' Bar
+    foo
+    Hello-World!
+    Bar
+
+    $ ./slugify.sh -e foo 'Hello World!' Bar
+    foo-Hello-World!-Bar
+
+    $ ./slugify.sh -el foo 'Hello World!' Bar
+    foo-hello-world!-bar
+
+    $ ./slugify.sh -exl foo Hello World! Bar
+    foo-hello-world-bar
+
+If you use the `-r` switch, arguments are threated as file names to be slugifed
+(and renamed). Here's the output if you run it dry (no renaming) in the
+directory of this repository — `$ ./slugify.sh -rn -lx *`:
+
+    CHANGELOG.md -> changelog.md
+    LICENSE -> license
+    README.md -> readme.md
+    src -> skipped (no change)
+    tests -> skipped (no change)
 
 
 ## Usage
@@ -68,32 +95,6 @@ this helps me automate it.
 - `4` original file not found
 - `5` slugified file exists
 
-
-## Examples
-
-    $ ./slugify.sh foo 'Hello World!' Bar
-    foo
-    Hello-World!
-    Bar
-
-    $ ./slugify.sh -e foo 'Hello World!' Bar
-    foo-Hello-World!-Bar
-
-    $ ./slugify.sh -el foo 'Hello World!' Bar
-    foo-hello-world!-bar
-
-    $ ./slugify.sh -exl foo Hello World! Bar
-    foo-hello-world-bar
-
-If you use the `-r` switch, arguments are threated as file names to be slugifed
-(and renamed). Here's the output if you run it dry (no renaming) in the
-directory of this repository — `$ ./slugify.sh -rn -lx *`:
-
-    CHANGELOG.md -> changelog.md
-    LICENSE -> license
-    README.md -> readme.md
-    src -> skipped (no change)
-    tests -> skipped (no change)
 
 ## Development
 
