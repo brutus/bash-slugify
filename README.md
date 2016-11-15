@@ -1,20 +1,17 @@
 # BASH Slugify
 
-It slugifies strings. In your BASH.
-
-I need to clean filenames — like uploaded images — regularly and this helps me
-automate it.
+It slugifies strings. In your BASH. Well, I need to clean filenames — like
+uploaded images — regularly and this helps me automate it.
 
 
 ## What's happening?
 
-- Optionally convert to upper- or lower case (default: no change).
+- _Optionally_ convert to upper- or lower case (default: no change).
 
-- Optionally all *special chars* (`[^a-zA-Z0-9]`) are removed or replaced
+- _Optionally_ all *special chars* (`[^a-zA-Z0-9]`) are removed or replaced
   (default: `_`).
 
-- Optionally all *glue characters* (`[-_.]`) are replaced with spaces (but
-  there are options to keep them).
+- _Optionally_ all or some *glue characters* (`[-_.]`) are replaced with spaces.
 
 - Whitespace is consolidated and trimmed.
 
@@ -28,11 +25,13 @@ automate it.
     Hello-World!
     Bar
 
+    $ ./slugify.sh foo -l 'Hello World!' Bar
+    foo
+    hello-world!
+    bar
+
     $ ./slugify.sh -e foo 'Hello World!' Bar
     foo-Hello-World!-Bar
-
-    $ ./slugify.sh -el foo 'Hello World!' Bar
-    foo-hello-world!-bar
 
     $ ./slugify.sh -exl foo Hello World! Bar
     foo-hello-world-bar
