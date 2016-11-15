@@ -12,6 +12,8 @@
 # 1: error parsing arguments
 # 2: original string is empty
 # 3: slugified string is empty
+# 4: original file not found
+# 5: slugified file exists
 
 if [ "$(basename -- $0)" == "bash" ]; then
   MAIN=0
@@ -29,7 +31,6 @@ TO_UPPERCASE=0
 TO_LOWERCASE=0
 REMOVE_SPECIAL_CHARS=0
 REPLACE_SPECIAL_CHARS=0
-IGNORE_EXT=0
 
 # space options
 KEEP_DASHES=0
@@ -45,12 +46,14 @@ REPLACEMENT_CHAR='_'
 # mode options
 EXTEND=0
 MOVE=0
+IGNORE_EXT=0
 DRY_RUN=0
 FORCE=0
 
 # other options
 VERBOSE=0
 DEBUG=0
+PADDING=''
 
 
 ### ARGUMENTS
@@ -119,7 +122,6 @@ function print_options(){
   >&2 echo "# TO_LOWERCASE: ${TO_LOWERCASE}"
   >&2 echo "# REMOVE_SPECIAL_CHARS: ${REMOVE_SPECIAL_CHARS}"
   >&2 echo "# REPLACE_SPECIAL_CHARS: ${REPLACE_SPECIAL_CHARS}"
-  >&2 echo "# IGNORE_EXT: ${IGNORE_EXT}"
   >&2 echo '#'
   >&2 echo '# [space options]'
   >&2 echo "# KEEP_DASHES: ${KEEP_DASHES}"
@@ -137,6 +139,7 @@ function print_options(){
   >&2 echo "# MOVE: ${MOVE}"
   >&2 echo "#"
   >&2 echo "# [rename options]"
+  >&2 echo "# IGNORE_EXT: ${IGNORE_EXT}"
   >&2 echo "# DRY_RUN: ${DRY_RUN}"
   >&2 echo "# FORCE: ${FORCE}"
   >&2 echo '#'
@@ -161,9 +164,6 @@ function get_arguments() {
         ;;
       X)
         REPLACE_SPECIAL_CHARS=1
-        ;;
-      E)
-        IGNORE_EXT=0
         ;;
       D)
         KEEP_DASHES=1
@@ -197,6 +197,9 @@ function get_arguments() {
       r)
         MOVE=1
         ;;
+      E)
+        IGNORE_EXT=1
+        ;;
       n)
         DRY_RUN=1
         ;;
@@ -205,9 +208,12 @@ function get_arguments() {
         ;;
       v)
         VERBOSE=1
+        PADDING='  '
         ;;
       d)
         DEBUG=1
+        VERBOSE=1
+        PADDING='  '
         ;;
       h)
         print_help
@@ -222,16 +228,22 @@ function get_arguments() {
         ;;
     esac
   done
+  # check args
   if [ ${TO_LOWERCASE} -eq 1 -a ${TO_UPPERCASE} -eq 1 ]; then
-    echo "'-l' and '-u' can't be used together." >&2
+    echo "[ERROR] '-l' and '-u' can't be used together." >&2
     print_usage 1
   fi
   if [ ${REMOVE_SPECIAL_CHARS} -eq 1 -a ${REPLACE_SPECIAL_CHARS} -eq 1 ]; then
-    echo "'-x' and '-X' can't be used together." >&2
+    echo "[ERROR] '-x' and '-X' can't be used together." >&2
     print_usage 1
   fi
   if [ ${set_space_char} -eq 2 ]; then
-    echo "'-c' and '-s' can't be used together." >&2
+    echo "[ERROR] '-c' and '-s' can't be used together." >&2
+    print_usage 1
+  fi
+  if [ $# -eq 0 ]; then
+    echo "[ERROR] at least one argument is needed. Try '-h' for help." >&2
+    echo >&2
     print_usage 1
   fi
 }
@@ -357,26 +369,9 @@ function slugify(){
 function rename(){
   # creates a newname with slugify and tries to rename the file
 
-  ## BUILD NAME
+  ## GET PARTS
 
-  # get fullname
   local fullname="$@"
-
-  # verbose output (full name)
-  if [ ${VERBOSE} -eq 1 ]; then
-    echo "- '${fullname}'"
-    padding='  '
-  else
-    padding=''
-  fi
-
-  # check if file exists
-  if [ ! -f "${fullname}" ]; then
-    if [ ${MOVE} -eq 1 ]; then
-      echo "${padding}[WARNING] '${fullname}' not found." >&2
-      return 1
-    fi
-  fi
 
   # get filename
   local path="${fullname%/*}"
@@ -402,59 +397,66 @@ function rename(){
     if [ "${ext}" == "${fullname}" ]; then
       ext=''
     else
-      if [ ${IGNORE_EXT} -eq 0 ]; then
-        ext="$(slugify "${ext}")"
-      fi
       ext=".${ext}"
     fi
   fi
 
-  # verbose output (basename only)
-  if [ ${VERBOSE} -eq 1 ]; then
-    echo "${padding}'${name}'"
+  # debug output (name parts)
+  if [ ${DEBUG} -eq 1 ]; then
+    echo "${PADDING}org path: '${path}'"
+    echo "${PADDING}org name: '${name}'"
+    echo "${PADDING}org ext.: '${ext}'"
   fi
 
   ## BUILD NEW NAME
 
-  newname="$(slugify "${name}")"
+  local newname="$(slugify "${name}")"
+
+  if [ ${IGNORE_EXT} -eq 0 ]; then
+    if [ ! -z "${ext}" ]; then
+      ext=".$(slugify "${ext}")"
+    fi
+  fi
+
+  # debug output (new name)
+  if [ ${DEBUG} -eq 1 ]; then
+    echo "${PADDING}new path: '${path}'"
+    echo "${PADDING}new name: '${newname}'"
+    echo "${PADDING}new ext.: '${ext}'"
+  fi
 
   # check newname
   if [ -z "${newname}" ]; then
-    echo "${padding}[ERROR] '${name}' results in an empty string." >&2
+    echo "${PADDING}[ERROR] '${name}' results in an empty string." >&2
     return 1
-  fi
-
-  # verbose output (new name)
-  if [ ${VERBOSE} -eq 1 ]; then
-    echo "${padding}'${newname}'"
   fi
 
   # build new fullname
   local newfullname="${path}${newname}${ext}"
 
-  ## DO YOUR THING
+  ## RENAME
 
-  if [ ${MOVE} -eq 1 ]; then
-
-    # RENAME
-
+  if [ ${DRY_RUN} -eq 0 ]; then
+    # check if file exists
+    if [ ! -f "${fullname}" ]; then
+      echo "${PADDING}[WARNING] '${fullname}' not found." >&2
+      return 4
+    fi
+    # rename file
     if [ "${fullname}" != "${newfullname}" ]; then
-      echo "${padding}${fullname} -> ${newfullname}"
+      echo "${PADDING}${fullname} -> ${newfullname}"
       if [ -f "${newfullname}" ]; then
-        echo "${padding}[WARNING] '${newfullname}' already exists." >&2
+        echo "${PADDING}[WARNING] '${newfullname}' already exists." >&2
         if [ ${FORCE} -eq 0 ]; then
-          return
+          return 5
         fi
       fi
       mv "${fullname}" "${newfullname}"
+    else
+      echo "${PADDING}skipping ${fullname} (no change)"
     fi
-
   else
-
-    # JUST LIST
-
-    echo "${padding}${newfullname}"
-
+    echo "${PADDING}${newfullname}"
   fi
 }
 
@@ -467,13 +469,6 @@ function main(){
 
   get_arguments "$@"
   shift $((OPTIND-1))
-
-  # check args
-  if [ $# -eq 0 ]; then
-    echo "[ERROR] at least one argument is needed. Try '-h' for help." >&2
-    echo >&2
-    print_usage 1
-  fi
 
   # print verbose stuff
   if [ ${DEBUG} -eq 1 ]; then
@@ -488,18 +483,29 @@ function main(){
 
   ## LOOP OVER ARGS
 
-  # return one slug for all arguments (consolidated)
   if [ ${EXTEND} -eq 1 ]; then
+    # return one slug for all arguments (consolidated)
     newname="$(slugify "$@")"
     echo "${newname}"
     if [ -z "${newname}" ]; then
       exit 3
     fi
-
-  # rename each file given as argument
+  elif [ ${MOVE} -eq 1 ]; then
+    # rename each file given as argument
+    for string in "$@"; do
+      if [ ${VERBOSE} -eq 1 ]; then
+        echo "- ${string}"
+      fi
+      rename "${string}"
+    done
   else
-    for fn in "$@"; do
-      rename "${fn}"
+    # list slug for each file given as argument
+    for string in "$@"; do
+      if [ ${VERBOSE} -eq 1 ]; then
+        echo "- ${string}"
+      fi
+      local slug=$(slugify "${string}")
+      echo "${PADDING}${slug}"
     done
   fi
 }

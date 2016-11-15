@@ -32,7 +32,6 @@ this helps me automate it.
       -u  convert to uppercase
       -x  remove special chars
       -X  replace special chars
-      -E  don't slugify file extensions
 
     space options
       -D  don't convert dashes to spaces
@@ -47,10 +46,11 @@ this helps me automate it.
       -s use underscores for spaces (shortcut for '-c_')
 
     mode options
-      -e  extend — treat all arguments as one string and echo a slug for it
+      -e  extended — treat all arguments as one string and echo one slug for it
       -r  rename files – treat arguments as filenames and rename them
 
     rename options
+      -E  don't slugify file extensions
       -n  dry run — only show new file names (no renaming)
       -f  force — overwrite existing files
 
@@ -65,6 +65,8 @@ this helps me automate it.
 - `1` error parsing arguments
 - `2` original string is empty
 - `3` slugified string is empty
+- `4` original file not found
+- `5` slugified file exists
 
 
 ## Examples
