@@ -29,14 +29,14 @@ TO_UPPERCASE=0
 TO_LOWERCASE=0
 REMOVE_SPECIAL_CHARS=0
 REPLACE_SPECIAL_CHARS=0
+IGNORE_EXT=0
 
 # space options
 KEEP_DASHES=0
 KEEP_UNDERSCORES=0
 KEEP_DOTS=0
-KEEP_SPACES_AROUND_DASHSCORES=0
+KEEP_SPACES_AROUND_DASHES=0
 CONSOLIDATE_SPACES=1
-IGNORE_EXT=0
 
 # replacement options
 SPACE_CHAR='-'
@@ -55,20 +55,22 @@ DEBUG=0
 
 ### ARGUMENTS
 
-OPTS_STRING=':lurxDUPASEc:C:semnfvdh'
-OPTION_STRING='[(l|u)|(r|x)|D|U|P|A|S|E|(c <char>|s)|C <char>|e|m|n|f|v|d|h]…'
-USAGE="usage: slugify ${OPTION_STRING} <filename>…"
-DESCRIPTION='Slugifies filenames. List or changes the names of given files.'
+OPTS_STRING=':luxXEDUPASc:C:sernfvdh'
+OPTION_STRING='[(l|u)|(x|X)|E|D|U|P|A|S|(c<char>|s)|C<char>|e|r|n|f|v|d|h]…'
 
-HELP="${USAGE}
+DESCRIPTION='Slugifies strings or filenames.'
+USAGE="usage: slugify ${OPTION_STRING} <string>…"
 
-${DESCRIPTION}
+HELP="${DESCRIPTION}
+
+${USAGE}
 
 character options
   -l  convert to lowercase
   -u  convert to uppercase
-  -r  remove special chars
-  -x  replace special chars
+  -x  remove special chars
+  -X  replace special chars
+  -E  don't slugify file extensions
 
 space options
   -D  don't convert dashes to spaces
@@ -76,7 +78,6 @@ space options
   -P  don't convert dots (points) to spaces
   -A  don't remove spaces around dashes and underscores
   -S  don't consolidate multiple spaces
-  -E  don't slugify extension
 
 replacement options
   -c <char> replace all spaces with this (default: '-')
@@ -84,10 +85,12 @@ replacement options
   -s use underscores for spaces (shortcut for '-c_')
 
 mode options
-  -e  extend — echo a slug for all arguments as one string (no rename)
-  -m  move – rename files
-  -n  dry run — show what would be renamed (don't do it)
-  -f  force — overwrite existing files (on rename)
+  -e  extend — treat all arguments as one string and echo a slug for it
+  -r  rename files – treat arguments as filenames and rename them
+
+rename options
+  -n  dry run — only show new file names (no renaming)
+  -f  force — overwrite existing files
 
 other options
   -v  verbose output
@@ -116,14 +119,14 @@ function print_options(){
   >&2 echo "# TO_LOWERCASE: ${TO_LOWERCASE}"
   >&2 echo "# REMOVE_SPECIAL_CHARS: ${REMOVE_SPECIAL_CHARS}"
   >&2 echo "# REPLACE_SPECIAL_CHARS: ${REPLACE_SPECIAL_CHARS}"
+  >&2 echo "# IGNORE_EXT: ${IGNORE_EXT}"
   >&2 echo '#'
   >&2 echo '# [space options]'
   >&2 echo "# KEEP_DASHES: ${KEEP_DASHES}"
   >&2 echo "# KEEP_UNDERSCORES: ${KEEP_UNDERSCORES}"
   >&2 echo "# KEEP_DOTS: ${KEEP_DOTS}"
-  >&2 echo "# KEEP_SPACES_AROUND_DASHSCORES: ${KEEP_SPACES_AROUND_DASHSCORES}"
+  >&2 echo "# KEEP_SPACES_AROUND_DASHES: ${KEEP_SPACES_AROUND_DASHES}"
   >&2 echo "# CONSOLIDATE_SPACES: ${CONSOLIDATE_SPACES}"
-  >&2 echo "# IGNORE_EXT: ${IGNORE_EXT}"
   >&2 echo '#'
   >&2 echo '# [replacement options]'
   >&2 echo "# SPACE_CHAR: '${SPACE_CHAR}'"
@@ -132,6 +135,8 @@ function print_options(){
   >&2 echo '# [mode options]'
   >&2 echo "# EXTEND: ${EXTEND}"
   >&2 echo "# MOVE: ${MOVE}"
+  >&2 echo "#"
+  >&2 echo "# [rename options]"
   >&2 echo "# DRY_RUN: ${DRY_RUN}"
   >&2 echo "# FORCE: ${FORCE}"
   >&2 echo '#'
@@ -151,11 +156,14 @@ function get_arguments() {
       u)
         TO_UPPERCASE=1
         ;;
-      r)
+      x)
         REMOVE_SPECIAL_CHARS=1
         ;;
-      x)
+      X)
         REPLACE_SPECIAL_CHARS=1
+        ;;
+      E)
+        IGNORE_EXT=0
         ;;
       D)
         KEEP_DASHES=1
@@ -167,13 +175,10 @@ function get_arguments() {
         KEEP_DOTS=1
         ;;
       A)
-        KEEP_SPACES_AROUND_DASHSCORES=1
+        KEEP_SPACES_AROUND_DASHES=1
         ;;
       S)
         CONSOLIDATE_SPACES=0
-        ;;
-      E)
-        IGNORE_EXT=0
         ;;
       c)
         SPACE_CHAR=${OPTARG}
@@ -189,7 +194,7 @@ function get_arguments() {
       e)
         EXTEND=1
         ;;
-      m)
+      r)
         MOVE=1
         ;;
       n)
@@ -222,7 +227,7 @@ function get_arguments() {
     print_usage 1
   fi
   if [ ${REMOVE_SPECIAL_CHARS} -eq 1 -a ${REPLACE_SPECIAL_CHARS} -eq 1 ]; then
-    echo "'-r' and '-x' can't be used together." >&2
+    echo "'-x' and '-X' can't be used together." >&2
     print_usage 1
   fi
   if [ ${set_space_char} -eq 2 ]; then
@@ -247,10 +252,11 @@ function slugify(){
   fi
 
   if [ ${DEBUG} -eq 1 ]; then
-    echo "# SLUG 1: '${name}' (${#name})" >&2
+    echo "# SLUG 1 (base)........: '${name}' (${#name})" >&2
   fi
 
-  ## HANDLE CHARACTERS
+
+  ## HANDLE CHARACTERS 1 (case)
 
   # convert to uppercase
   if [ ${TO_UPPERCASE} -eq 1 ]; then
@@ -262,10 +268,11 @@ function slugify(){
     name=$(echo "${name}" | tr A-ZÄÖÜ a-zäöü)
   fi
 
-  # replace special chars
-  if [ ${REPLACE_SPECIAL_CHARS} -eq 1 ]; then
-    name=$(echo "${name//[^${safechars}]/$REPLACEMENT_CHAR}")
+  if [ ${DEBUG} -eq 1 ]; then
+    echo "# SLUG 2 (case)........: '${name}' (${#name})" >&2
   fi
+
+  ## HANDLE CHARACTERS 2 (remove special chars)
 
   # remove special chars
   if [ ${REMOVE_SPECIAL_CHARS} -eq 1 ]; then
@@ -273,14 +280,14 @@ function slugify(){
   fi
 
   if [ ${DEBUG} -eq 1 ]; then
-    echo "# SLUG 2: '${name}' (${#name})" >&2
+    echo "# SLUG 3 (del x chars).: '${name}' (${#name})" >&2
   fi
 
-  ## HANDLE SPACES
+  ## HANDLE SPACES 1 (remove dashes, dots and underscores)
 
   # remove dashes?
   if [ ${KEEP_DASHES} -eq 0 ]; then
-    name=$(echo "${name//-/' '}")
+    name=$(echo "${name//-/ }")
   fi
 
   # remove underscores?
@@ -293,17 +300,19 @@ function slugify(){
     name=$(echo "${name//./ }")
   fi
 
+  if [ ${DEBUG} -eq 1 ]; then
+    echo "# SLUG 4 (cast space)..: '${name}' (${#name})" >&2
+  fi
+
+  ## HANDLE SPACES 2 (consolidate)
+
   # consolidate spaces
   if [ ${CONSOLIDATE_SPACES} -eq 1 ]; then
     name=$(echo "${name}" | tr -s '[:space:]')
   fi
 
-  if [ ${DEBUG} -eq 1 ]; then
-    echo "# SLUG 3: '${name}' (${#name})" >&2
-  fi
-
   # keep spaces around dashes and underscores?
-  if [ ${KEEP_SPACES_AROUND_DASHSCORES} -eq 0 ]; then
+  if [ ${KEEP_SPACES_AROUND_DASHES} -eq 0 ]; then
     name=$(echo "${name// -/-}")
     name=$(echo "${name//- /-}")
     name=$(echo "${name// _/_}")
@@ -314,12 +323,27 @@ function slugify(){
 
   name=$(echo "${name}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
-  # replace space
+  if [ ${DEBUG} -eq 1 ]; then
+    echo "# SLUG 5 (consolidate).: '${name}' (${#name})" >&2
+  fi
+
+  ## HANDLE CHARACTERS 3 (replace special chars)
+
+  # replace special chars
+  if [ ${REPLACE_SPECIAL_CHARS} -eq 1 ]; then
+    name=$(echo "${name//[^${safechars}]/$REPLACEMENT_CHAR}")
+  fi
+
+  if [ ${DEBUG} -eq 1 ]; then
+    echo "# SLUG 6 (repl chars)..: '${name}' (${#name})" >&2
+  fi
+
+  ## REPLACE SPACES
 
   name=$(echo "${name// /$SPACE_CHAR}")
 
   if [ ${DEBUG} -eq 1 ]; then
-    echo "# SLUG 4: '${name}' (${#name})" >&2
+    echo "# SLUG 7 (repl space)..: '${name}' (${#name})" >&2
   fi
 
   # return slug
@@ -328,9 +352,9 @@ function slugify(){
 }
 
 
-## MODES
+## RENAME
 
-function run(){
+function rename(){
   # creates a newname with slugify and tries to rename the file
 
   ## BUILD NAME
@@ -464,7 +488,7 @@ function main(){
 
   ## LOOP OVER ARGS
 
-  # retun one slug for all arguments (consolidated)
+  # return one slug for all arguments (consolidated)
   if [ ${EXTEND} -eq 1 ]; then
     newname="$(slugify "$@")"
     echo "${newname}"
@@ -472,10 +496,10 @@ function main(){
       exit 3
     fi
 
-  # rename each file given as arg
+  # rename each file given as argument
   else
     for fn in "$@"; do
-      run "${fn}"
+      rename "${fn}"
     done
   fi
 }
